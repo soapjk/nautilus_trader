@@ -80,6 +80,7 @@ env/
 .null-ls*
 PERF.JSON
 output.json
+.fuse_hidden*
 
 # AI assistants and tools
 .cursorignore

@@ -49,7 +49,7 @@ load_dotenv(Path.cwd() / ".env", override=True)
 LONGPORT_APP_KEY = os.getenv("LONGPORT_APP_KEY", "")
 LONGPORT_APP_SECRET = os.getenv("LONGPORT_APP_SECRET", "")
 LONGPORT_ACCESS_TOKEN = os.getenv("LONGPORT_ACCESS_TOKEN", "")
-
+print("longport app key:",LONGPORT_APP_KEY[:10])
 # 验证认证信息是否已配置
 if not all([LONGPORT_APP_KEY, LONGPORT_APP_SECRET, LONGPORT_ACCESS_TOKEN]):
     print("警告: Longport 认证信息未完整配置!")
@@ -94,6 +94,9 @@ INSTRUMENTS = [
 # 生成 instrument IDs
 instrument_ids = [InstrumentId.from_str(s) for s in INSTRUMENTS]
 
+# 同时生成字符串列表用于Rust配置
+instrument_id_strs = [str(instr_id) for instr_id in instrument_ids]
+
 
 # ========================================================================
 # 数据采集节点配置
@@ -137,12 +140,14 @@ config = TradingNodeConfig(
     data_clients={
         LONGPORT: LongportDataClientConfig(
             # 从 .env 文件读取的认证信息
+            http_url="https://openapi.longportapp.cn",
+            ws_url="wss://openapi-quote.longportapp.cn",
             app_key=LONGPORT_APP_KEY,
             app_secret=LONGPORT_APP_SECRET,
             access_token=LONGPORT_ACCESS_TOKEN,
             markets=["HK", "US"],  # Use string representation (Python config)
             instrument_provider=InstrumentProviderConfig(
-                load_ids=frozenset(instrument_ids),  # 只加载指定的交易对
+                load_ids=frozenset(instrument_id_strs),  # 只加载指定的交易对（使用字符串格式）
             ),
         ),
     },

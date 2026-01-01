@@ -126,9 +126,11 @@ impl LongportDataClient {
             .block_on(QuoteContext::try_new(Arc::new(longport_config)))
             .context("failed to create Longport quote context")?;
 
-        // Note: data_sender will be obtained in connect() when TLS context is available
-        // We cannot get it here because new() is called during factory.create() which
-        // happens during TradingNode.build(), before the runner starts and sets TLS.
+        // Try to get data_sender from TLS - this will work if new() is called from the runner thread
+        // If TLS is not yet initialized, we'll try again in connect()
+        let data_sender = std::panic::catch_unwind(|| {
+            Some(get_data_event_sender())
+        }).ok().flatten();
 
         Ok(Self {
             client_id,
@@ -140,7 +142,7 @@ impl LongportDataClient {
             tasks: Vec::new(),
             instruments: Arc::new(RwLock::new(AHashMap::new())),
             clock,
-            data_sender: None,  // Will be set in connect() when TLS context is available
+            data_sender,  // Try to set in new(), will retry in connect() if None
         })
     }
 
@@ -297,7 +299,16 @@ impl LongportDataClient {
         let instrument_id = match Self::find_instrument_id_by_symbol(&symbol, instruments) {
             Some(id) => id,
             None => {
-                tracing::debug!("Received event for unknown symbol: {symbol}");
+                // Log all cached instruments for debugging
+                let guard = instruments.read().expect(MUTEX_POISONED);
+                tracing::warn!(
+                    "❌ [LONGPORT] No instrument found for symbol: {symbol}. Cached instruments: {}",
+                    guard.iter()
+                        .map(|(id, inst)| format!("{}(symbol={})", id, inst.id().symbol.as_str()))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                );
+                drop(guard);
                 return;
             }
         };
@@ -457,9 +468,25 @@ impl DataClient for LongportDataClient {
         // Get the data event sender from TLS - this is called when connect() is executed
         // in the Nautilus runner context where TLS is properly initialized
         if self.data_sender.is_none() {
-            tracing::info!("Obtaining data_event_sender from TLS context...");
-            self.data_sender = Some(get_data_event_sender());
-            tracing::info!("data_event_sender obtained successfully");
+            // Use catch_unwind to handle TLS not being available in the current thread
+            let sender = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                get_data_event_sender()
+            }));
+
+            match sender {
+                Ok(s) => {
+                    tracing::info!("data_event_sender obtained successfully from TLS");
+                    self.data_sender = Some(s);
+                }
+                Err(_) => {
+                    // TLS not available - this shouldn't happen if connect is called from runner
+                    anyhow::bail!(
+                        "Failed to get data_event_sender from TLS. \
+                        This usually means connect() was called from outside the Nautilus runner context. \
+                        Thread: {:?}", std::thread::current().id()
+                    );
+                }
+            }
         }
 
         // Strategy: Use load_ids if specified, otherwise fall back to security_list API
@@ -1040,9 +1067,10 @@ impl DataClient for LongportDataClient {
 impl LongportDataClient {
     #[new]
     fn py_new(
-        client_id: nautilus_model::identifiers::ClientId,
+        client_id: &str,
         config: crate::config::LongportDataClientConfig,
     ) -> PyResult<Self> {
+        let client_id = nautilus_model::identifiers::ClientId::from(client_id);
         Self::new(client_id, config).map_err(|e| {
             pyo3::PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
                 "Failed to create LongportDataClient: {e}"

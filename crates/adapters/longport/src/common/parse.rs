@@ -291,11 +291,18 @@ pub fn parse_instrument(instrument: LongportInstrument) -> anyhow::Result<Instru
     let price_increment = Price::new(instrument.tick_size, price_precision as u8);
     let quantity_increment = Quantity::new(instrument.lot_size as f64, quantity_precision as u8);
 
+    // Determine currency from market
+    let currency = match instrument.market {
+        crate::common::enums::LongportMarket::HK => Currency::HKD(),
+        crate::common::enums::LongportMarket::US => Currency::USD(),
+        crate::common::enums::LongportMarket::CN => Currency::CNY(),
+    };
+
     let equity_instrument = Equity::new_checked(
         instrument_id,
         symbol,
         None, // isin
-        Currency::USD(), // TODO: determine from market
+        currency,
         price_precision as u8,
         price_increment,
         Some(quantity_increment), // lot_size
