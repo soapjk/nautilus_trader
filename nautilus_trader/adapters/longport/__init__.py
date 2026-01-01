@@ -19,20 +19,23 @@ This subpackage provides an instrument provider, data and execution clients,
 configurations, data types and constants for connecting to and interacting with
 Longport's OpenSDK API.
 
-The adapter is implemented in Rust for high performance, with Python bindings
-provided through PyO3.
+The adapter follows the OKX architecture pattern:
+- Core WebSocket and HTTP clients are implemented in Rust
+- DataClient is implemented in Python using LiveMarketDataClient as base
+- This avoids TLS (Thread Local Storage) issues with the Rust DataClient trait
 """
 
-# Python configuration classes (for serialization)
+# Python configuration classes
 from nautilus_trader.adapters.longport.config import (
     LongportDataClientConfig,
     LongportExecClientConfig,
 )
 
-# Python factory classes (wrap Rust clients)
+# Python factory classes (following OKX pattern)
 from nautilus_trader.adapters.longport.factories import (
     LongportLiveDataClientFactory,
     LongportLiveExecClientFactory,
+    get_cached_longport_instrument_provider,
 )
 
 # Rust types from nautilus_pyo3.longport
@@ -83,4 +86,5 @@ __all__ = [
     "LongportLiveDataClientFactory",
     "LongportLiveExecClientFactory",
     "LongportMarket",
+    "get_cached_longport_instrument_provider",
 ]

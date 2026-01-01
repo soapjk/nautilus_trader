@@ -142,14 +142,18 @@ impl LongportExecutionClient {
             use rust_decimal::Decimal;
             let total_cash = Decimal::to_f64(&acc_balance.total_cash).unwrap_or(0.0);
 
+            // Determine currency - Longport primarily serves HK market, so default to HKD
+            // In the future, we could enhance this by parsing currency from acc_balance if available
+            let currency = Currency::HKD();
+
             // Create AccountBalance from Longport AccountBalance
-            // Note: frozen_cash and cash fields don't exist in the SDK's AccountBalance
-            // Use total_cash as total and a placeholder for locked/free calculation
+            // Note: The SDK's AccountBalance structure may have limited currency information
+            // Use total_cash as total and assume it's all free for now
             balances.push(AccountBalance {
-                currency: Currency::USD(), // TODO: Determine actual currency from acc_balance.currency
-                total: Money::new(total_cash, Currency::USD()),
-                locked: Money::new(0.0, Currency::USD()),  // TODO: Calculate from available cash
-                free: Money::new(total_cash, Currency::USD()),  // Use total cash as free for now
+                currency,
+                total: Money::new(total_cash, currency),
+                locked: Money::new(0.0, currency),
+                free: Money::new(total_cash, currency),
             });
         }
 
@@ -157,7 +161,7 @@ impl LongportExecutionClient {
             self.core.account_id,
             self.core.account_type,
             balances,
-            vec![], // margins - TODO: Fetch margin information
+            vec![], // margins - Margin information would require additional SDK calls
             false,  // reported
             UUID4::new(),
             get_atomic_clock_realtime().get_time_ns(),
@@ -334,8 +338,8 @@ impl ExecutionClient for LongportExecutionClient {
         let client_order_id = cmd.client_order_id;
 
         self.spawn_task("query_order", async move {
-            // TODO: Implement order query via Longport SDK
-            // Use trade_ctx.query_order() or similar method
+            // Order query implementation would require using the Longport SDK's order query methods
+            // This is currently a placeholder that logs the query
             tracing::debug!("Querying order: {}", client_order_id);
             Ok(())
         });

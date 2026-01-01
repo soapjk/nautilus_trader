@@ -121,13 +121,10 @@ pub fn trade_to_trade_tick(
 
     // Determine aggressor side from trade type if available
     // Longport trade types: empty (normal), *, D, M, P, U, X, Y
-    // We'll default to NoAggressor if unknown
+    // The trade_type field doesn't directly indicate aggressor side (buyer/seller initiated)
+    // so we use NoAggressor as the default
     use nautilus_model::enums::AggressorSide;
-    let aggressor_side = if trade.trade_type.is_empty() {
-        AggressorSide::NoAggressor
-    } else {
-        AggressorSide::NoAggressor // TODO: Map trade types to sides
-    };
+    let aggressor_side = AggressorSide::NoAggressor;
 
     Ok(TradeTick::new(
         instrument_id,
