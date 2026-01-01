@@ -172,6 +172,7 @@ def _build_rust_libs() -> None:
             "nautilus-model",
             "nautilus-persistence",
             "nautilus-pyo3",
+            "nautilus-longport",  # Add longport adapter to build
         ]
 
         if BUILD_MODE == "release":
