@@ -97,6 +97,13 @@ class LongportDataClient(LiveMarketDataClient):
         self._config = config
         self._is_connected = False
 
+        # Create the Rust LongportDataClient
+        # The Rust implementation handles all WebSocket connections and data processing
+        self._rust_client = nautilus_pyo3.longport.LongportDataClient(
+            client_id=name or LONGPORT_VENUE.value,
+            config=config,
+        )
+
         # Task management
         self._ws_tasks: list[asyncio.Task] = []
         self._reconnect_task: asyncio.Task | None = None
@@ -130,10 +137,9 @@ class LongportDataClient(LiveMarketDataClient):
 
             self._log.info(f"Total instruments in cache: {len(list(self._cache.instruments()))}")
 
-            # Create Rust QuoteContext through PyO3 bindings
-            # The QuoteContext is now managed by the Rust LongportDataClient
-            # We just need to store a reference to it for future use
-            self._quote_ctx = None  # Will be set by Rust implementation
+            # Connect the Rust client (handles WebSocket connections and data processing)
+            self._rust_client.connect()
+            self._log.info("Rust client connected successfully")
 
             self._is_connected = True
             self._log.info("Connected to Longport", LogColor.GREEN)
@@ -145,6 +151,9 @@ class LongportDataClient(LiveMarketDataClient):
     async def _disconnect(self) -> None:
         """Disconnect from the Longport API."""
         self._log.info("Disconnecting from Longport...")
+
+        # Disconnect the Rust client
+        self._rust_client.disconnect()
 
         # Cancel all tasks
         if self._reconnect_task:
@@ -177,14 +186,9 @@ class LongportDataClient(LiveMarketDataClient):
         else:
             self._log.error(f"❌ [PYTHON] Instrument NOT found in cache: {command.instrument_id}")
 
+        # Subscribe via Rust client
+        self._rust_client.subscribe_quotes(instrument_id_str)
         self._subscribed_quotes.add(instrument_id_str)
-
-        # TODO: Actually subscribe to Longport SDK here
-        # Currently Python client is just a wrapper - need to integrate with Rust QuoteContext
-        self._log.warning(
-            f"⚠️  [PYTHON] Quote subscription for {instrument_id_str} is only tracked locally. "
-            f"Actual SDK subscription not yet implemented in Python client."
-        )
 
         self._log.info(f"✅ [PYTHON] Subscribed {instrument_id_str} quotes (tracking count: {len(self._subscribed_quotes)})", LogColor.GREEN)
 
@@ -192,6 +196,8 @@ class LongportDataClient(LiveMarketDataClient):
         """Unsubscribe from quote tick data."""
         instrument_id_str = command.instrument_id.value
         self._log.info(f"Unsubscribing from quote ticks for {instrument_id_str}")
+        # Unsubscribe via Rust client
+        self._rust_client.unsubscribe_quotes(instrument_id_str)
         self._subscribed_quotes.discard(instrument_id_str)
 
     async def _subscribe_trade_ticks(self, command: SubscribeTradeTicks) -> None:
@@ -206,14 +212,9 @@ class LongportDataClient(LiveMarketDataClient):
         else:
             self._log.error(f"❌ [PYTHON] Instrument NOT found in cache: {command.instrument_id}")
 
+        # Subscribe via Rust client
+        self._rust_client.subscribe_trades(instrument_id_str)
         self._subscribed_trades.add(instrument_id_str)
-
-        # TODO: Actually subscribe to Longport SDK here
-        # Currently Python client is just a wrapper - need to integrate with Rust QuoteContext
-        self._log.warning(
-            f"⚠️  [PYTHON] Trade subscription for {instrument_id_str} is only tracked locally. "
-            f"Actual SDK subscription not yet implemented in Python client."
-        )
 
         self._log.info(f"✅ [PYTHON] Subscribed {instrument_id_str} trades (tracking count: {len(self._subscribed_trades)})", LogColor.GREEN)
 
@@ -221,6 +222,8 @@ class LongportDataClient(LiveMarketDataClient):
         """Unsubscribe from trade tick data."""
         instrument_id_str = command.instrument_id.value
         self._log.info(f"Unsubscribing from trade ticks for {instrument_id_str}")
+        # Unsubscribe via Rust client
+        self._rust_client.unsubscribe_trades(instrument_id_str)
         self._subscribed_trades.discard(instrument_id_str)
 
     async def _subscribe_bars(self, command: SubscribeBars) -> None:
@@ -261,14 +264,9 @@ class LongportDataClient(LiveMarketDataClient):
             )
             return
 
+        # Subscribe via Rust client
+        self._rust_client.subscribe_book_deltas(instrument_id_str)
         self._subscribed_books.add(instrument_id_str)
-
-        # TODO: Actually subscribe to Longport SDK here
-        # Currently Python client is just a wrapper - need to integrate with Rust QuoteContext
-        self._log.warning(
-            f"⚠️  [PYTHON] Order book subscription for {instrument_id_str} is only tracked locally. "
-            f"Actual SDK subscription not yet implemented in Python client."
-        )
 
         self._log.info(f"✅ [PYTHON] Subscribed {instrument_id_str} order book deltas (depth={command.depth}, tracking count: {len(self._subscribed_books)})", LogColor.GREEN)
 
@@ -276,6 +274,8 @@ class LongportDataClient(LiveMarketDataClient):
         """Unsubscribe from order book deltas."""
         instrument_id_str = command.instrument_id.value
         self._log.info(f"Unsubscribing from order book deltas for {instrument_id_str}")
+        # Unsubscribe via Rust client
+        self._rust_client.unsubscribe_book_deltas(instrument_id_str)
         self._subscribed_books.discard(instrument_id_str)
 
     # ========== Request handlers ==========

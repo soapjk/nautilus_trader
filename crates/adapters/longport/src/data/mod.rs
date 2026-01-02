@@ -48,6 +48,7 @@ use nautilus_core::{
     MUTEX_POISONED,
     datetime::datetime_to_unix_nanos,
     time::{AtomicTime, get_atomic_clock_realtime},
+    UUID4,
 };
 use nautilus_data::client::DataClient;
 use nautilus_model::{
@@ -69,6 +70,33 @@ use crate::{
     },
     config::LongportDataClientConfig,
 };
+
+/// Helper function to parse an instrument from a Longport SDK Security
+fn parse_instrument_from_security(
+    security: &longport::quote::Security,
+    market: LongportMarket,
+) -> anyhow::Result<InstrumentAny> {
+    // Convert SDK Security to our internal LongportInstrument format
+    let name = if !security.name_en.is_empty() {
+        security.name_en.clone()
+    } else if !security.name_cn.is_empty() {
+        security.name_cn.clone()
+    } else {
+        security.symbol.clone()
+    };
+
+    // Use default lot size since Security doesn't contain lot_size info
+    let lot_size = 100;
+
+    let longport_instrument = LongportInstrument::new_with_lot_size(
+        security.symbol.clone(),
+        name,
+        market,
+        lot_size,
+    );
+
+    parse_instrument(longport_instrument)
+}
 
 /// LongPort market data client.
 #[cfg_attr(feature = "python", pyo3::pyclass(module = "nautilus_trader.core.nautilus_pyo3.longport"))]
@@ -568,7 +596,11 @@ impl DataClient for LongportDataClient {
         self.cancellation_token.cancel();
 
         // Cancel all subscriptions
-        // TODO: Implement proper subscription cancellation via Longport SDK
+        // Note: The Longport SDK manages subscriptions at the connection level.
+        // When we cancel the event consumption task and close the connection,
+        // all subscriptions are automatically cancelled.
+        // Individual subscriptions can be cancelled using the unsubscribe methods
+        // (unsubscribe_quotes, unsubscribe_trades, unsubscribe_book_deltas) if needed.
 
         let handles: Vec<_> = self.tasks.drain(..).collect();
         for handle in handles {
@@ -797,6 +829,7 @@ impl DataClient for LongportDataClient {
         let start_nanos = datetime_to_unix_nanos(start);
         let end_nanos = datetime_to_unix_nanos(end);
         let markets = self.config.markets.clone();
+        let quote_ctx = self.quote_ctx.clone();
 
         // Use stored data_sender if available, otherwise try TLS
         let data_sender = match &self.data_sender {
@@ -808,11 +841,38 @@ impl DataClient for LongportDataClient {
         };
 
         get_runtime().spawn(async move {
-            let all_instruments = Vec::new(); // Not mutable since we don't add to it
+            let mut all_instruments: Vec<InstrumentAny> = Vec::new();
 
             for market in markets {
-                // TODO: Implement actual instrument fetching via Longport SDK
-                tracing::debug!("Fetching instruments for market: {:?}", market);
+                // Convert LongportMarket to SDK Market type
+                let sdk_market = match market {
+                    LongportMarket::HK => Market::HK,
+                    LongportMarket::US => Market::US,
+                    LongportMarket::CN => Market::CN,
+                };
+
+                // Fetch security list from Longport SDK
+                match quote_ctx.security_list(sdk_market, None::<SecurityListCategory>).await {
+                    Ok(securities) => {
+                        tracing::info!("Fetched {} securities for market {:?}", securities.len(), sdk_market);
+
+                        // Convert SDK Security to InstrumentAny
+                        for security in securities {
+                            let symbol = security.symbol.clone();
+                            match parse_instrument_from_security(&security, market) {
+                                Ok(instrument) => {
+                                    all_instruments.push(instrument);
+                                }
+                                Err(e) => {
+                                    tracing::warn!("Failed to parse instrument for {}: {}", symbol, e);
+                                }
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        tracing::error!("Failed to fetch instruments for market {:?}: {}", sdk_market, e);
+                    }
+                }
             }
 
             let response = DataResponse::Instruments(InstrumentsResponse::new(
@@ -1130,6 +1190,144 @@ impl LongportDataClient {
             .map_err(|e| {
                 pyo3::PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
                     "Stop failed: {e}"
+                ))
+            })
+    }
+
+    // Subscribe methods for Python integration
+    // These are simple wrapper methods that call the internal subscription logic
+
+    fn subscribe_quotes(&mut self, instrument_id_str: &str) -> PyResult<()> {
+        use nautilus_common::messages::data::SubscribeQuotes;
+        use nautilus_model::identifiers::InstrumentId;
+
+        let instrument_id = InstrumentId::from(instrument_id_str);
+        let cmd = SubscribeQuotes::new(
+            instrument_id,
+            Some(self.client_id),
+            Some(self.venue()),
+            UUID4::new(),
+            self.clock.get_time_ns(),
+            None,
+        );
+
+        <Self as nautilus_data::client::DataClient>::subscribe_quotes(self, &cmd)
+            .map_err(|e| {
+                pyo3::PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
+                    "Failed to subscribe to quotes: {e}"
+                ))
+            })
+    }
+
+    fn unsubscribe_quotes(&mut self, instrument_id_str: &str) -> PyResult<()> {
+        use nautilus_common::messages::data::UnsubscribeQuotes;
+        use nautilus_model::identifiers::InstrumentId;
+
+        let instrument_id = InstrumentId::from(instrument_id_str);
+        let cmd = UnsubscribeQuotes::new(
+            instrument_id,
+            Some(self.client_id),
+            Some(self.venue()),
+            UUID4::new(),
+            self.clock.get_time_ns(),
+            None,
+        );
+
+        <Self as nautilus_data::client::DataClient>::unsubscribe_quotes(self, &cmd)
+            .map_err(|e| {
+                pyo3::PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
+                    "Failed to unsubscribe from quotes: {e}"
+                ))
+            })
+    }
+
+    fn subscribe_trades(&mut self, instrument_id_str: &str) -> PyResult<()> {
+        use nautilus_common::messages::data::SubscribeTrades;
+        use nautilus_model::identifiers::InstrumentId;
+
+        let instrument_id = InstrumentId::from(instrument_id_str);
+        let cmd = SubscribeTrades::new(
+            instrument_id,
+            Some(self.client_id),
+            Some(self.venue()),
+            UUID4::new(),
+            self.clock.get_time_ns(),
+            None,
+        );
+
+        <Self as nautilus_data::client::DataClient>::subscribe_trades(self, &cmd)
+            .map_err(|e| {
+                pyo3::PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
+                    "Failed to subscribe to trades: {e}"
+                ))
+            })
+    }
+
+    fn unsubscribe_trades(&mut self, instrument_id_str: &str) -> PyResult<()> {
+        use nautilus_common::messages::data::UnsubscribeTrades;
+        use nautilus_model::identifiers::InstrumentId;
+
+        let instrument_id = InstrumentId::from(instrument_id_str);
+        let cmd = UnsubscribeTrades::new(
+            instrument_id,
+            Some(self.client_id),
+            Some(self.venue()),
+            UUID4::new(),
+            self.clock.get_time_ns(),
+            None,
+        );
+
+        <Self as nautilus_data::client::DataClient>::unsubscribe_trades(self, &cmd)
+            .map_err(|e| {
+                pyo3::PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
+                    "Failed to unsubscribe from trades: {e}"
+                ))
+            })
+    }
+
+    fn subscribe_book_deltas(&mut self, instrument_id_str: &str) -> PyResult<()> {
+        use nautilus_common::messages::data::SubscribeBookDeltas;
+        use nautilus_model::{identifiers::InstrumentId, enums::BookType};
+
+        let instrument_id = InstrumentId::from(instrument_id_str);
+        let cmd = SubscribeBookDeltas::new(
+            instrument_id,
+            BookType::L2_MBP,
+            Some(self.client_id),
+            Some(self.venue()),
+            UUID4::new(),
+            self.clock.get_time_ns(),
+            None,
+            false,
+            None,
+        );
+
+        <Self as nautilus_data::client::DataClient>::subscribe_book_deltas(self, &cmd)
+            .map_err(|e| {
+                pyo3::PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
+                    "Failed to subscribe to book deltas: {e}"
+                ))
+            })
+    }
+
+    fn unsubscribe_book_deltas(&mut self, instrument_id_str: &str) -> PyResult<()> {
+        use nautilus_common::messages::data::UnsubscribeBookDeltas;
+        use nautilus_model::identifiers::InstrumentId;
+
+        let instrument_id = InstrumentId::from(instrument_id_str);
+        let cmd = UnsubscribeBookDeltas::new(
+            instrument_id,
+            Some(self.client_id),
+            Some(self.venue()),
+            UUID4::new(),
+            self.clock.get_time_ns(),
+            None,
+        );
+
+        <Self as nautilus_data::client::DataClient>::unsubscribe_book_deltas(self, &cmd)
+            .map_err(|e| {
+                pyo3::PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
+                    "Failed to unsubscribe from book deltas: {e}"
                 ))
             })
     }

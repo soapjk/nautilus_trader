@@ -26,13 +26,13 @@ from nautilus_trader.adapters.longport.config import (
     LongportDataClientConfig,
     LongportExecClientConfig,
 )
+from nautilus_trader.adapters.longport.data import LongportDataClient
 from nautilus_trader.adapters.longport.execution import LongportExecutionClient
 from nautilus_trader.adapters.longport.providers import LongportInstrumentProvider
 from nautilus_trader.cache.cache import Cache
 from nautilus_trader.common.component import LiveClock
 from nautilus_trader.common.component import MessageBus
 from nautilus_trader.config import InstrumentProviderConfig
-from nautilus_trader.core import nautilus_pyo3
 from nautilus_trader.live.factories import LiveDataClientFactory
 from nautilus_trader.live.factories import LiveExecClientFactory
 
@@ -99,34 +99,29 @@ class LongportLiveDataClientFactory(LiveDataClientFactory):
 
         Returns
         -------
-        Rust LongportDataClient wrapper
+        LongportDataClient
+            The Python Longport data client (which wraps Rust implementation).
 
         """
-        # Create the Rust LongportDataClient
-        # The Rust implementation handles all WebSocket connections and data processing
-        # Pass the name as string directly - Rust will convert it to ClientId
-        rust_client = nautilus_pyo3.longport.LongportDataClient(
-            client_id=name,
-            config=config,
-        )
-
-        # Still need to load instruments into Python cache for compatibility
+        # Get the instrument provider
         provider = get_cached_longport_instrument_provider(
             markets=tuple(config.markets),
             config=config.instrument_provider,
         )
 
-        # Load instruments asynchronously and add to cache
-        # This is needed for the DataEngine to find instruments
-        async def load_instruments():
-            await provider.load_all_async()
-            for instrument in provider._instruments.values():
-                cache.add_instrument(instrument)
+        # Create and return the Python LongportDataClient
+        # The Python client wraps the Rust implementation internally
+        client = LongportDataClient(
+            loop=loop,
+            msgbus=msgbus,
+            cache=cache,
+            clock=clock,
+            instrument_provider=provider,
+            config=config,
+            name=name,
+        )
 
-        # Schedule instrument loading
-        loop.create_task(load_instruments())
-
-        return rust_client
+        return client
 
 
 class LongportLiveExecClientFactory(LiveExecClientFactory):

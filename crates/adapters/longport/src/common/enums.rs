@@ -476,9 +476,9 @@ mod tests {
 
     #[test]
     fn test_longport_market_as_str() {
-        assert_eq!(LongportMarket::Hk.as_str(), "HK");
-        assert_eq!(LongportMarket::Us.as_str(), "US");
-        assert_eq!(LongportMarket::Cn.as_str(), "CN");
+        assert_eq!(LongportMarket::HK.as_str(), "HK");
+        assert_eq!(LongportMarket::US.as_str(), "US");
+        assert_eq!(LongportMarket::CN.as_str(), "CN");
     }
 
     #[test]
