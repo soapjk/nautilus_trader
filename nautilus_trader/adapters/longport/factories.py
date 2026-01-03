@@ -33,8 +33,62 @@ from nautilus_trader.cache.cache import Cache
 from nautilus_trader.common.component import LiveClock
 from nautilus_trader.common.component import MessageBus
 from nautilus_trader.config import InstrumentProviderConfig
+from nautilus_trader.core import nautilus_pyo3
 from nautilus_trader.live.factories import LiveDataClientFactory
 from nautilus_trader.live.factories import LiveExecClientFactory
+
+
+@lru_cache(1)
+def get_cached_longport_clients(
+    app_key: str | None = None,
+    app_secret: str | None = None,
+    access_token: str | None = None,
+    http_url: str | None = None,
+    quote_ws_url: str | None = None,
+    trade_ws_url: str | None = None,
+) -> tuple:
+    """
+    Cache and return Longport QuoteContext, HTTP client, WebSocket client, and event receiver.
+
+    Following the OKX architecture pattern, QuoteContext is created once and shared
+    between HTTP and WebSocket clients via Arc.
+
+    If a cached client with matching parameters already exists, the cached client will be returned.
+
+    Parameters
+    ----------
+    app_key : str, optional
+        The app key for the client.
+    app_secret : str, optional
+        The app secret for the client.
+    access_token : str, optional
+        The access token for the client.
+    http_url : str, optional
+        Custom HTTP URL (default: https://openapi.longportapp.com)
+    quote_ws_url : str, optional
+        Custom quote WebSocket URL (default: wss://openapi-quote.longportapp.com/v2)
+    trade_ws_url : str, optional
+        Custom trade WebSocket URL (default: wss://openapi-trade.longportapp.com/v2)
+
+    Returns
+    -------
+    tuple
+        (quote_ctx, http_client, ws_client, event_receiver)
+
+    """
+    quote_ctx, event_receiver = nautilus_pyo3.longport.create_quote_context(
+        app_key=app_key or "",
+        app_secret=app_secret or "",
+        access_token=access_token or "",
+        http_url=http_url,
+        quote_ws_url=quote_ws_url,
+        trade_ws_url=trade_ws_url,
+    )
+
+    http_client = nautilus_pyo3.longport.LongportHttpClient(quote_ctx)
+    ws_client = nautilus_pyo3.longport.LongportWebSocketClient(quote_ctx)
+
+    return quote_ctx, http_client, ws_client, event_receiver
 
 
 @lru_cache(1)
@@ -110,7 +164,7 @@ class LongportLiveDataClientFactory(LiveDataClientFactory):
         )
 
         # Create and return the Python LongportDataClient
-        # The Python client wraps the Rust implementation internally
+        # The client will create QuoteContext, HTTP/WebSocket clients internally in _connect()
         client = LongportDataClient(
             loop=loop,
             msgbus=msgbus,

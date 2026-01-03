@@ -19,5 +19,5 @@ pub mod client;
 pub mod error;
 pub mod parse;
 
-pub use client::{LongportHttpClient, LongportRawHttpClient};
+pub use client::LongportHttpClient;
 pub use error::LongportHttpError;

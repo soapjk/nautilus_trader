@@ -13,13 +13,15 @@
 //  limitations under the License.
 // -------------------------------------------------------------------------------------------------
 
+//! Test binary for Longport adapter connectivity.
+//!
+//! This tests the Rust HTTP and WebSocket clients that wrap the Longport SDK.
+
 use std::env;
 
-use nautilus_data::client::DataClient;
-use nautilus_model::identifiers::ClientId;
-
-/// Test binary for Longport adapter connectivity.
-fn main() -> anyhow::Result<()> {
+/// Test the Longport adapter clients.
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
     // Initialize logging
     tracing_subscriber::fmt::init();
 
@@ -46,30 +48,36 @@ fn main() -> anyhow::Result<()> {
     println!("Access Token: ***");
     println!();
 
-    // Create data client
-    let client_id = ClientId::from("LONGPORT");
-    let config = nautilus_longport::config::LongportDataClientConfig {
-        app_key: Some(app_key),
-        app_secret: Some(app_secret),
-        access_token: Some(access_token),
-        markets: vec![nautilus_longport::common::enums::LongportMarket::HK],
-        ..Default::default()
-    };
+    // Create Longport configuration
+    let config = longport::Config::new(app_key, app_secret, access_token);
 
-    match nautilus_longport::data::LongportDataClient::new(client_id, config) {
-        Ok(client) => {
-            println!("✓ Data client created successfully");
-            println!("  Client ID: {}", client.client_id());
-            println!("  Venue: {:?}", client.venue());
-        }
-        Err(e) => {
-            eprintln!("✗ Failed to create data client: {e}");
-            std::process::exit(1);
-        }
-    }
+    // Test QuoteContext creation
+    println!("Testing QuoteContext creation...");
+    let (quote_ctx, _event_receiver) = longport::quote::QuoteContext::try_new(std::sync::Arc::new(config))
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to create QuoteContext: {e}"))?;
+
+    println!("✓ QuoteContext created successfully");
+
+    // Test creating HTTP client from context
+    println!("Testing HTTP client creation...");
+    let http_client = nautilus_longport::http::LongportHttpClient::from_context_internal(
+        std::sync::Arc::new(quote_ctx.clone())
+    );
+    println!("✓ HTTP client created successfully");
+
+    // Test creating WebSocket client from context
+    println!("Testing WebSocket client creation...");
+    let ws_client = nautilus_longport::websocket::LongportWebSocketClient::from_context_internal(
+        std::sync::Arc::new(quote_ctx)
+    );
+    println!("✓ WebSocket client created successfully");
 
     println!();
     println!("Test completed successfully!");
+    println!();
+    println!("Note: DataClient is now implemented in Python following the OKX pattern.");
+    println!("Use the Python LiveMarketDataClient for full functionality.");
 
     Ok(())
 }

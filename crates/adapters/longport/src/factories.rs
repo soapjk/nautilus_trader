@@ -18,18 +18,16 @@
 use std::{any::Any, cell::RefCell, rc::Rc};
 
 use nautilus_common::{cache::Cache, clock::Clock};
-use nautilus_data::client::DataClient;
 use nautilus_execution::client::{ExecutionClient, base::ExecutionClientCore};
 use nautilus_model::{
     enums::{AccountType, OmsType},
     identifiers::ClientId,
 };
-use nautilus_system::factories::{ClientConfig, DataClientFactory, ExecutionClientFactory};
+use nautilus_system::factories::{ClientConfig, ExecutionClientFactory};
 
 use crate::{
     common::consts::LONGPORT_VENUE,
     config::{LongportDataClientConfig, LongportExecClientConfig},
-    data::LongportDataClient,
     execution::LongportExecutionClient,
 };
 
@@ -45,63 +43,8 @@ impl ClientConfig for LongportExecClientConfig {
     }
 }
 
-/// Factory for creating Longport data clients.
-#[derive(Debug, Clone)]
-#[cfg_attr(
-    feature = "python",
-    pyo3::pyclass(module = "nautilus_trader.core.nautilus_pyo3.longport")
-)]
-#[cfg_attr(
-    feature = "python",
-    pyo3_stub_gen::derive::gen_stub_pyclass(module = "nautilus_trader.adapters.longport")
-)]
-pub struct LongportDataClientFactory;
-
-impl LongportDataClientFactory {
-    /// Creates a new [`LongportDataClientFactory`] instance.
-    #[must_use]
-    pub const fn new() -> Self {
-        Self
-    }
-}
-
-impl Default for LongportDataClientFactory {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl DataClientFactory for LongportDataClientFactory {
-    fn create(
-        &self,
-        name: &str,
-        config: &dyn ClientConfig,
-        _cache: Rc<RefCell<Cache>>,
-        _clock: Rc<RefCell<dyn Clock>>,
-    ) -> anyhow::Result<Box<dyn DataClient>> {
-        let longport_config = config
-            .as_any()
-            .downcast_ref::<LongportDataClientConfig>()
-            .ok_or_else(|| {
-                anyhow::anyhow!(
-                    "Invalid config type for LongportDataClientFactory. Expected LongportDataClientConfig, was {config:?}",
-                )
-            })?
-            .clone();
-
-        let client_id = ClientId::from(name);
-        let client = LongportDataClient::new(client_id, longport_config)?;
-        Ok(Box::new(client))
-    }
-
-    fn name(&self) -> &'static str {
-        "LONGPORT"
-    }
-
-    fn config_type(&self) -> &'static str {
-        "LongportDataClientConfig"
-    }
-}
+// NOTE: LongportDataClientFactory is removed since DataClient is now implemented in Python
+// following the OKX architecture pattern. Only ExecutionClientFactory remains in Rust.
 
 /// Factory for creating Longport execution clients.
 #[derive(Debug, Clone)]
@@ -260,13 +203,6 @@ mod tests {
                 .to_string()
                 .contains("Invalid config type")
         );
-    }
-
-    #[rstest]
-    fn test_longport_data_client_factory_creation() {
-        let factory = LongportDataClientFactory::new();
-        assert_eq!(factory.name(), "LONGPORT");
-        assert_eq!(factory.config_type(), "LongportDataClientConfig");
     }
 
     #[rstest]

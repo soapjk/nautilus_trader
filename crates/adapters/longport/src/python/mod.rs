@@ -23,12 +23,10 @@ use pyo3::prelude::*;
 #[cfg(feature = "python")]
 use nautilus_system::get_global_pyo3_registry;
 
-use quote_context::{PyQuoteContext, PyPushEventReceiver, create_minimal_instrument_py};
+use quote_context::{PyQuoteContext, PyPushEventReceiver, create_minimal_instrument_py, create_quote_context};
 
 // NOTE: Longport DataClient is now implemented in Python (nautilus_trader/adapters/longport/data.py)
-// following the OKX architecture pattern. This avoids TLS (Thread Local Storage) issues that
-// occurred when trying to get data_event_sender from the Rust DataClient trait implementation.
-// Only the configuration classes are exposed here for use by the Python implementation.
+// following the OKX architecture pattern. Only HTTP/WebSocket clients and configs are exposed.
 
 /// Extractor function for `LongportDataClientConfig`.
 #[cfg(feature = "python")]
@@ -37,20 +35,6 @@ fn extract_longport_data_config(py: Python<'_>, config: Py<PyAny>) -> PyResult<B
         Ok(concrete_config) => Ok(Box::new(concrete_config)),
         Err(e) => Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
             "Failed to extract LongportDataClientConfig: {e}"
-        ))),
-    }
-}
-
-/// Extractor function for `LongportExecutionClientFactory`.
-#[cfg(feature = "python")]
-fn extract_longport_exec_factory(
-    py: Python<'_>,
-    factory: Py<PyAny>,
-) -> PyResult<Box<dyn ExecutionClientFactory>> {
-    match factory.extract::<crate::factories::LongportExecutionClientFactory>(py) {
-        Ok(concrete_factory) => Ok(Box::new(concrete_factory)),
-        Err(e) => Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-            "Failed to extract LongportExecutionClientFactory: {e}"
         ))),
     }
 }
@@ -87,11 +71,15 @@ pub fn longport(_: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyQuoteContext>()?;
     m.add_class::<PyPushEventReceiver>()?;
     m.add_function(wrap_pyfunction!(create_minimal_instrument_py, m)?)?;
+    m.add_function(wrap_pyfunction!(create_quote_context, m)?)?;
 
-    // Add the Rust LongportDataClient for Python to use
-    m.add_class::<crate::data::LongportDataClient>()?;
+    // Add HTTP client for Python to use
+    m.add_class::<crate::http::LongportHttpClient>()?;
 
-    // Add factories
+    // Add WebSocket client for Python to use
+    m.add_class::<crate::websocket::LongportWebSocketClient>()?;
+
+    // Add execution client factory
     m.add_class::<crate::factories::LongportExecutionClientFactory>()?;
 
     // Register extractors with the global registry (only when python feature is enabled)
@@ -118,9 +106,6 @@ pub fn longport(_: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
                 "Failed to register longport exec config extractor: {e}"
             )));
         }
-
-        // NOTE: DataClientFactory extractor is NOT registered
-        // The Python implementation uses LiveDataClientFactory instead
     }
 
     Ok(())

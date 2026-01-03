@@ -17,9 +17,9 @@
 
 pub mod client;
 pub mod error;
-pub mod handler;
+// pub mod handler;  // TODO: Re-implement or remove
 pub mod messages;
 pub mod parse;
 
-pub use client::{HandlerCommand, LongportWebSocketClient};
+pub use client::LongportWebSocketClient;
 pub use error::LongportWsError;

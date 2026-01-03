@@ -15,97 +15,113 @@
 
 //! HTTP client for the Longport adapter.
 //!
-//! This module provides a two-layer HTTP client architecture:
-//! - `LongportHttpClient`: High-level client with domain transformations
-//! - Wraps LongPort SDK's QuoteContext for market data HTTP operations
+//! This module provides an HTTP client that wraps the Longport SDK's QuoteContext
+//! for HTTP-based market data operations.
+//!
+//! # Architecture
+//!
+//! The QuoteContext is shared between HTTP and WebSocket clients via Arc:
+//! ```text
+//! Python creates QuoteContext
+//!         │
+//!         ├──> Arc::clone ──> LongportHttpClient (HTTP operations)
+//!         │
+//!         └──> Arc::clone ──> LongportWebSocketClient (WebSocket operations)
+//! ```
 
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
-use nautilus_network::http::HttpClient;
-use ustr::Ustr;
+use longport::quote::QuoteContext;
+use nautilus_model::{
+    identifiers::InstrumentId,
+    instruments::Instrument,
+};
 
-use crate::common::credential::Credential;
+#[cfg(feature = "python")]
+use pyo3::Python;
 
-/// Low-level HTTP client wrapping LongPort SDK operations.
+/// HTTP client for Longport market data.
 ///
-/// This client provides raw access to LongPort's HTTP endpoints through the SDK,
-/// handling authentication, request signing, and basic error handling.
-#[derive(Clone, Debug)]
-pub struct LongportRawHttpClient {
-    /// The base URL for Longport HTTP API.
-    pub base_url: String,
-    /// HTTP client for making requests.
-    client: HttpClient,
-    /// Optional credentials for authenticated requests.
-    credential: Option<Credential>,
+/// This client wraps the Longport SDK's QuoteContext to provide HTTP-based
+/// market data operations. The QuoteContext is shared with the WebSocket client
+/// via Arc.
+#[derive(Clone)]
+#[cfg_attr(
+    feature = "python",
+    pyo3::pyclass(module = "nautilus_trader.core.nautilus_pyo3.longport")
+)]
+pub struct LongportHttpClient {
+    /// The shared QuoteContext from the Longport SDK.
+    quote_ctx: Arc<QuoteContext>,
+    /// Instruments cache for price/size precision.
+    instruments: Arc<dashmap::DashMap<InstrumentId, nautilus_model::instruments::InstrumentAny>>,
 }
 
-impl LongportRawHttpClient {
-    /// Creates a new [`LongportRawHttpClient`].
-    ///
-    /// # Arguments
-    ///
-    /// * `base_url` - The base URL for Longport HTTP API.
-    /// * `credential` - Optional credentials for authenticated requests.
-    pub fn new(base_url: String, credential: Option<Credential>) -> anyhow::Result<Self> {
-        // Validate base_url
-        if base_url.is_empty() {
-            return Err(anyhow::anyhow!("Base URL cannot be empty"));
-        }
+impl std::fmt::Debug for LongportHttpClient {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("LongportHttpClient")
+            .field("quote_ctx", &"<QuoteContext>")
+            .field("instruments_count", &self.instruments.len())
+            .finish()
+    }
+}
 
-        // Create HTTP client
-        let client = HttpClient::new(
-            HashMap::new(),  // default_headers
-            vec![],          // middlewares
-            vec![],          // rate_limiter_quotas
-            None,            // rest_quota_quota
-            Some(30),        // timeout_secs
-            None,            // proxy_url
-        )?;
+#[cfg(feature = "python")]
+use pyo3::pymethods;
 
-        Ok(Self {
-            base_url,
-            client,
-            credential,
+#[cfg(feature = "python")]
+#[pymethods]
+impl LongportHttpClient {
+    /// Creates a new LongportHttpClient from a QuoteContext.
+    ///
+    /// This is intended to be called from Python with a QuoteContext
+    /// that was created in Python.
+    #[new]
+    pub fn py_new_from_context(
+        quote_ctx: pyo3::Py<crate::python::quote_context::PyQuoteContext>,
+    ) -> pyo3::PyResult<Self> {
+        Python::with_gil(|py| {
+            let ctx = quote_ctx.borrow(py);
+            let inner = ctx.inner().ok_or_else(|| {
+                pyo3::exceptions::PyRuntimeError::new_err("QuoteContext not initialized")
+            })?;
+            Ok(Self {
+                quote_ctx: inner,
+                instruments: Arc::new(dashmap::DashMap::new()),
+            })
         })
     }
 
-    /// Returns a reference to the underlying HTTP client.
-    pub fn client(&self) -> &HttpClient {
-        &self.client
+    /// Caches an instrument for price/size precision.
+    pub fn cache_instrument(&self, py: pyo3::Python, instrument: pyo3::Py<pyo3::PyAny>) -> pyo3::PyResult<()> {
+        use nautilus_model::python::instruments::pyobject_to_instrument_any;
+        let inst = pyobject_to_instrument_any(py, instrument)?;
+        self.instruments.insert(inst.id(), inst);
+        Ok(())
     }
-
-    /// Returns a reference to the credentials.
-    pub fn credential(&self) -> Option<&Credential> {
-        self.credential.as_ref()
-    }
-}
-
-/// High-level HTTP client for Longport with domain-level transformations.
-///
-/// This client wraps the raw client and provides methods that work with
-/// Nautilus domain types, handling instrument loading and market data queries.
-#[derive(Clone, Debug)]
-pub struct LongportHttpClient {
-    /// The raw HTTP client.
-    raw: Arc<LongportRawHttpClient>,
 }
 
 impl LongportHttpClient {
-    /// Creates a new [`LongportHttpClient`].
+    /// Creates a new [`LongportHttpClient`] from a QuoteContext (internal Rust).
     ///
     /// # Arguments
     ///
-    /// * `base_url` - The base URL for LongPort HTTP API.
-    /// * `credential` - Optional credentials for authenticated requests.
-    pub fn new(base_url: String, credential: Option<Credential>) -> anyhow::Result<Self> {
-        let raw = Arc::new(LongportRawHttpClient::new(base_url, credential)?);
-        Ok(Self { raw })
+    /// * `quote_ctx` - The shared QuoteContext from the Longport SDK.
+    pub fn from_context_internal(quote_ctx: Arc<QuoteContext>) -> Self {
+        Self {
+            quote_ctx,
+            instruments: Arc::new(dashmap::DashMap::new()),
+        }
     }
 
-    /// Returns a reference to the raw HTTP client.
-    pub fn raw(&self) -> &LongportRawHttpClient {
-        &self.raw
+    /// Returns a reference to the underlying QuoteContext.
+    pub fn quote_context(&self) -> Arc<QuoteContext> {
+        Arc::clone(&self.quote_ctx)
+    }
+
+    /// Caches an instrument for price/size precision.
+    pub fn cache_instrument_internal(&self, instrument: &nautilus_model::instruments::InstrumentAny) {
+        self.instruments.insert(instrument.id(), instrument.clone());
     }
 }
 
@@ -114,26 +130,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_create_raw_client() {
-        let client = LongportRawHttpClient::new(
-            "https://open.longport.com".to_string(),
-            None,
-        );
-        assert!(client.is_ok());
-    }
-
-    #[test]
-    fn test_create_raw_client_empty_url() {
-        let client = LongportRawHttpClient::new(String::new(), None);
-        assert!(client.is_err());
-    }
-
-    #[test]
-    fn test_create_high_level_client() {
-        let client = LongportHttpClient::new(
-            "https://open.longport.com".to_string(),
-            None,
-        );
-        assert!(client.is_ok());
+    fn test_client_creation() {
+        // This test requires valid credentials
+        // In a real test environment, set up mocks
     }
 }

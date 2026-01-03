@@ -19,10 +19,26 @@ use nautilus_model::identifiers::{AccountId, TraderId};
 
 use crate::common::enums::LongportMarket;
 
+// Default Longport API endpoints (from official SDK)
+// https://github.com/longportapp/openapi
+const LONGPORT_HTTP_URL_DEFAULT: &str = "https://openapi.longportapp.com";
+const LONGPORT_QUOTE_WS_URL_DEFAULT: &str = "wss://openapi-quote.longportapp.com/v2";
+const LONGPORT_TRADE_WS_URL_DEFAULT: &str = "wss://openapi-trade.longportapp.com/v2";
+
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
 
 /// Configuration for the Longport data client.
+///
+/// # Environment Variables
+///
+/// The Longport SDK supports the following environment variables:
+/// - `LONGPORT_HTTP_URL`: HTTP endpoint URL (default: https://openapi.longportapp.com)
+/// - `LONGPORT_QUOTE_WS_URL`: Quote WebSocket URL (default: wss://openapi-quote.longportapp.com/v2)
+/// - `LONGPORT_TRADE_WS_URL`: Trade WebSocket URL (default: wss://openapi-trade.longportapp.com/v2)
+/// - `LONGPORT_APP_KEY`: App key
+/// - `LONGPORT_APP_SECRET`: App secret
+/// - `LONGPORT_ACCESS_TOKEN`: Access token
 #[derive(Clone, Debug)]
 #[cfg_attr(
     feature = "python",
@@ -49,8 +65,10 @@ pub struct LongportDataClientConfig {
     pub http_timeout_secs: Option<u64>,
     /// Optional custom HTTP URL.
     pub http_url: Option<String>,
-    /// Optional custom WebSocket URL.
-    pub ws_url: Option<String>,
+    /// Optional custom quote WebSocket URL (real-time market data).
+    pub quote_ws_url: Option<String>,
+    /// Optional custom trade WebSocket URL (order status updates).
+    pub trade_ws_url: Option<String>,
 }
 
 impl Default for LongportDataClientConfig {
@@ -63,7 +81,8 @@ impl Default for LongportDataClientConfig {
             load_ids: None,
             http_timeout_secs: Some(30),
             http_url: None,
-            ws_url: None,
+            quote_ws_url: None,
+            trade_ws_url: None,
         }
     }
 }
@@ -80,7 +99,8 @@ impl LongportDataClientConfig {
             load_ids: None,
             http_timeout_secs: Some(30),
             http_url: None,
-            ws_url: None,
+            quote_ws_url: None,
+            trade_ws_url: None,
         }
     }
 
@@ -117,9 +137,46 @@ impl LongportDataClientConfig {
             .clone()
             .or_else(|| std::env::var("LONGPORT_ACCESS_TOKEN").ok())
     }
+
+    /// Returns the HTTP URL, from config or environment variable.
+    #[must_use]
+    pub fn get_http_url(&self) -> Option<String> {
+        self.http_url
+            .clone()
+            .or_else(|| std::env::var("LONGPORT_HTTP_URL").ok())
+            .or(Some(LONGPORT_HTTP_URL_DEFAULT.to_string()))
+    }
+
+    /// Returns the quote WebSocket URL, from config or environment variable.
+    #[must_use]
+    pub fn get_quote_ws_url(&self) -> Option<String> {
+        self.quote_ws_url
+            .clone()
+            .or_else(|| std::env::var("LONGPORT_QUOTE_WS_URL").ok())
+            .or(Some(LONGPORT_QUOTE_WS_URL_DEFAULT.to_string()))
+    }
+
+    /// Returns the trade WebSocket URL, from config or environment variable.
+    #[must_use]
+    pub fn get_trade_ws_url(&self) -> Option<String> {
+        self.trade_ws_url
+            .clone()
+            .or_else(|| std::env::var("LONGPORT_TRADE_WS_URL").ok())
+            .or(Some(LONGPORT_TRADE_WS_URL_DEFAULT.to_string()))
+    }
 }
 
 /// Configuration for the Longport execution client.
+///
+/// # Environment Variables
+///
+/// The Longport SDK supports the following environment variables:
+/// - `LONGPORT_HTTP_URL`: HTTP endpoint URL (default: https://openapi.longportapp.com)
+/// - `LONGPORT_QUOTE_WS_URL`: Quote WebSocket URL (default: wss://openapi-quote.longportapp.com/v2)
+/// - `LONGPORT_TRADE_WS_URL`: Trade WebSocket URL (default: wss://openapi-trade.longportapp.com/v2)
+/// - `LONGPORT_APP_KEY`: App key
+/// - `LONGPORT_APP_SECRET`: App secret
+/// - `LONGPORT_ACCESS_TOKEN`: Access token
 #[derive(Clone, Debug)]
 #[cfg_attr(
     feature = "python",
@@ -146,8 +203,10 @@ pub struct LongportExecClientConfig {
     pub http_timeout_secs: Option<u64>,
     /// Optional custom HTTP URL.
     pub http_url: Option<String>,
-    /// Optional custom WebSocket URL.
-    pub ws_url: Option<String>,
+    /// Optional custom quote WebSocket URL.
+    pub quote_ws_url: Option<String>,
+    /// Optional custom trade WebSocket URL.
+    pub trade_ws_url: Option<String>,
 }
 
 impl Default for LongportExecClientConfig {
@@ -161,7 +220,8 @@ impl Default for LongportExecClientConfig {
             markets: vec![LongportMarket::HK],
             http_timeout_secs: Some(30),
             http_url: None,
-            ws_url: None,
+            quote_ws_url: None,
+            trade_ws_url: None,
         }
     }
 }
@@ -179,7 +239,8 @@ impl LongportExecClientConfig {
             markets: vec![LongportMarket::HK],
             http_timeout_secs: Some(30),
             http_url: None,
-            ws_url: None,
+            quote_ws_url: None,
+            trade_ws_url: None,
         }
     }
 
@@ -231,7 +292,8 @@ impl LongportExecClientConfig {
         markets=None,
         http_timeout_secs=None,
         http_url=None,
-        ws_url=None
+        quote_ws_url=None,
+        trade_ws_url=None
     ))]
     pub fn py_new(
         trader_id: &str,
@@ -242,7 +304,8 @@ impl LongportExecClientConfig {
         markets: Option<Vec<LongportMarket>>,
         http_timeout_secs: Option<u64>,
         http_url: Option<String>,
-        ws_url: Option<String>,
+        quote_ws_url: Option<String>,
+        trade_ws_url: Option<String>,
     ) -> Self {
         Self {
             trader_id: TraderId::from(trader_id),
@@ -253,7 +316,8 @@ impl LongportExecClientConfig {
             markets: markets.unwrap_or_default(),
             http_timeout_secs,
             http_url,
-            ws_url,
+            quote_ws_url,
+            trade_ws_url,
         }
     }
 }
@@ -270,7 +334,8 @@ impl LongportDataClientConfig {
         load_ids=None,
         http_timeout_secs=None,
         http_url=None,
-        ws_url=None
+        quote_ws_url=None,
+        trade_ws_url=None
     ))]
     pub fn py_new(
         app_key: Option<String>,
@@ -280,7 +345,8 @@ impl LongportDataClientConfig {
         load_ids: Option<Vec<String>>,
         http_timeout_secs: Option<u64>,
         http_url: Option<String>,
-        ws_url: Option<String>,
+        quote_ws_url: Option<String>,
+        trade_ws_url: Option<String>,
     ) -> Self {
         Self {
             app_key,
@@ -290,7 +356,8 @@ impl LongportDataClientConfig {
             load_ids,
             http_timeout_secs,
             http_url,
-            ws_url,
+            quote_ws_url,
+            trade_ws_url,
         }
     }
 }
@@ -321,5 +388,22 @@ mod tests {
         let config = LongportDataClientConfig::new();
         assert_eq!(config.markets.len(), 1);
         assert_eq!(config.markets[0], LongportMarket::HK);
+    }
+
+    #[test]
+    fn test_longport_data_client_config_get_urls() {
+        let config = LongportDataClientConfig::default();
+        assert_eq!(
+            config.get_http_url(),
+            Some(LONGPORT_HTTP_URL_DEFAULT.to_string())
+        );
+        assert_eq!(
+            config.get_quote_ws_url(),
+            Some(LONGPORT_QUOTE_WS_URL_DEFAULT.to_string())
+        );
+        assert_eq!(
+            config.get_trade_ws_url(),
+            Some(LONGPORT_TRADE_WS_URL_DEFAULT.to_string())
+        );
     }
 }

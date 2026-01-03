@@ -141,7 +141,8 @@ config = TradingNodeConfig(
         LONGPORT: LongportDataClientConfig(
             # 从 .env 文件读取的认证信息
             http_url="https://openapi.longportapp.cn",
-            ws_url="wss://openapi-quote.longportapp.cn",
+            quote_ws_url="wss://openapi-quote.longportapp.cn",
+            trade_ws_url="wss://openapi-trade.longportapp.cn",
             app_key=LONGPORT_APP_KEY,
             app_secret=LONGPORT_APP_SECRET,
             access_token=LONGPORT_ACCESS_TOKEN,

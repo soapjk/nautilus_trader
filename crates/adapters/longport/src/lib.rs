@@ -66,7 +66,7 @@ pub use crate::{
         enums::{LongportMarket, LongportOrderType, LongportSecurityType, LongportSide},
         models::LongportInstrument,
     },
-    http::{LongportHttpClient, LongportRawHttpClient},
+    http::LongportHttpClient,
     websocket::LongportWebSocketClient,
     execution::LongportExecutionClient,
 };
