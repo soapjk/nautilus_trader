@@ -13,22 +13,11 @@
 //  limitations under the License.
 // -------------------------------------------------------------------------------------------------
 
-//! Common functionality shared across the Longport adapter.
-//!
-//! This module provides core utilities, constants, and data structures used throughout
-//! the Longport integration, including:
-//!
-//! - Common enumerations and constants.
-//! - Conversion utilities for Longport data to Nautilus types.
-//! - Parsing utilities for converting Longport data to Nautilus types.
-//! - Shared data models.
+//! HTTP module for the Longport adapter.
 
-pub mod consts;
-pub mod convert;
-pub mod credential;
-pub mod enums;
-pub mod models;
+pub mod client;
+pub mod error;
 pub mod parse;
 
-#[cfg(test)]
-pub(crate) mod testing;
+pub use client::{LongportHttpClient, LongportRawHttpClient};
+pub use error::LongportHttpError;

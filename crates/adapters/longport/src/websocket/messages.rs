@@ -13,22 +13,10 @@
 //  limitations under the License.
 // -------------------------------------------------------------------------------------------------
 
-//! Common functionality shared across the Longport adapter.
-//!
-//! This module provides core utilities, constants, and data structures used throughout
-//! the Longport integration, including:
-//!
-//! - Common enumerations and constants.
-//! - Conversion utilities for Longport data to Nautilus types.
-//! - Parsing utilities for converting Longport data to Nautilus types.
-//! - Shared data models.
+//! WebSocket message types for Longport.
 
-pub mod consts;
-pub mod convert;
-pub mod credential;
-pub mod enums;
-pub mod models;
-pub mod parse;
-
-#[cfg(test)]
-pub(crate) mod testing;
+//! TODO: Define message types for:
+//! - Subscription requests/responses
+//! - Market data push messages
+//! - Authentication messages
+//! - Reconnection sentinel (RECONNECTED)

@@ -13,22 +13,27 @@
 //  limitations under the License.
 // -------------------------------------------------------------------------------------------------
 
-//! Common functionality shared across the Longport adapter.
-//!
-//! This module provides core utilities, constants, and data structures used throughout
-//! the Longport integration, including:
-//!
-//! - Common enumerations and constants.
-//! - Conversion utilities for Longport data to Nautilus types.
-//! - Parsing utilities for converting Longport data to Nautilus types.
-//! - Shared data models.
+//! Parsing utilities for Longport HTTP responses.
 
-pub mod consts;
-pub mod convert;
-pub mod credential;
-pub mod enums;
-pub mod models;
-pub mod parse;
+//! TODO: Implement parsing functions for:
+//! - Instruments (parse_instrument)
+//! - Quotes (parse_quote)
+//! - Trade ticks (parse_trade_tick)
 
-#[cfg(test)]
-pub(crate) mod testing;
+// Placeholder module - parsing functions will be added here
+// as we integrate with LongPort SDK responses
+
+pub fn parse_instrument(_raw: &serde_json::Value) -> anyhow::Result<()> {
+    // TODO: Implement instrument parsing from LongPort SDK
+    Ok(())
+}
+
+pub fn parse_quote(_raw: &serde_json::Value) -> anyhow::Result<()> {
+    // TODO: Implement quote parsing from LongPort SDK
+    Ok(())
+}
+
+pub fn parse_trade_tick(_raw: &serde_json::Value) -> anyhow::Result<()> {
+    // TODO: Implement trade tick parsing from LongPort SDK
+    Ok(())
+}

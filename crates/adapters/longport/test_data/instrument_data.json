@@ -1,0 +1,16 @@
+{
+  "instruments": [
+    {
+      "symbol": "700.HK",
+      "name": "Tencent Holdings Ltd",
+      "security_type": "Stock",
+      "market": "HK",
+      "lot_size": "100",
+      "tick_size": "0.05",
+      "price_precision": 2,
+      "quantity_precision": 0,
+      "base_currency": "HKD",
+      "is_tradable": true
+    }
+  ]
+}

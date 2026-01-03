@@ -13,22 +13,24 @@
 //  limitations under the License.
 // -------------------------------------------------------------------------------------------------
 
-//! Common functionality shared across the Longport adapter.
-//!
-//! This module provides core utilities, constants, and data structures used throughout
-//! the Longport integration, including:
-//!
-//! - Common enumerations and constants.
-//! - Conversion utilities for Longport data to Nautilus types.
-//! - Parsing utilities for converting Longport data to Nautilus types.
-//! - Shared data models.
+//! Parsing utilities for Longport WebSocket messages.
 
-pub mod consts;
-pub mod convert;
-pub mod credential;
-pub mod enums;
-pub mod models;
-pub mod parse;
+//! TODO: Implement parsing functions for:
+//! - Quote ticks from WebSocket messages
+//! - Trade ticks from WebSocket messages
+//! - Order book deltas from WebSocket messages
 
-#[cfg(test)]
-pub(crate) mod testing;
+pub fn parse_quote_tick(_raw: &str) -> anyhow::Result<()> {
+    // TODO: Parse quote tick from WebSocket message
+    Ok(())
+}
+
+pub fn parse_trade_tick(_raw: &str) -> anyhow::Result<()> {
+    // TODO: Parse trade tick from WebSocket message
+    Ok(())
+}
+
+pub fn parse_order_book_delta(_raw: &str) -> anyhow::Result<()> {
+    // TODO: Parse order book delta from WebSocket message
+    Ok(())
+}

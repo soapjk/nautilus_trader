@@ -13,22 +13,34 @@
 //  limitations under the License.
 // -------------------------------------------------------------------------------------------------
 
-//! Common functionality shared across the Longport adapter.
-//!
-//! This module provides core utilities, constants, and data structures used throughout
-//! the Longport integration, including:
-//!
-//! - Common enumerations and constants.
-//! - Conversion utilities for Longport data to Nautilus types.
-//! - Parsing utilities for converting Longport data to Nautilus types.
-//! - Shared data models.
+//! WebSocket client errors for the Longport adapter.
 
-pub mod consts;
-pub mod convert;
-pub mod credential;
-pub mod enums;
-pub mod models;
-pub mod parse;
+use thiserror::Error;
 
-#[cfg(test)]
-pub(crate) mod testing;
+/// Represents errors that can occur during Longport WebSocket operations.
+#[derive(Debug, Error)]
+pub enum LongportWsError {
+    /// WebSocket connection error.
+    #[error("Connection error: {0}")]
+    ConnectionError(String),
+
+    /// Authentication error.
+    #[error("Authentication error: {0}")]
+    AuthenticationError(String),
+
+    /// Message parsing error.
+    #[error("Parse error: {0}")]
+    ParseError(String),
+
+    /// Rate limit exceeded.
+    #[error("Rate limit exceeded")]
+    RateLimited,
+
+    /// Invalid message received.
+    #[error("Invalid message: {0}")]
+    InvalidMessage(String),
+
+    /// Subscription failed.
+    #[error("Subscription failed: {0}")]
+    SubscriptionFailed(String),
+}

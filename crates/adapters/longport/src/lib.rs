@@ -53,6 +53,8 @@ pub mod config;
 pub mod data;
 pub mod execution;
 pub mod factories;
+pub mod http;
+pub mod websocket;
 
 #[cfg(feature = "python")]
 pub mod python;
@@ -60,9 +62,12 @@ pub mod python;
 // Re-exports
 pub use crate::{
     common::{
+        credential::Credential,
         enums::{LongportMarket, LongportOrderType, LongportSecurityType, LongportSide},
         models::LongportInstrument,
     },
+    http::{LongportHttpClient, LongportRawHttpClient},
+    websocket::LongportWebSocketClient,
     execution::LongportExecutionClient,
 };
 

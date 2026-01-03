@@ -1,0 +1,12 @@
+{
+  "trades": [
+    {
+      "symbol": "700.HK",
+      "price": "350.30",
+      "size": "1000",
+      "side": "buy",
+      "trade_id": "123456789",
+      "timestamp": "1704284800500"
+    }
+  ]
+}
