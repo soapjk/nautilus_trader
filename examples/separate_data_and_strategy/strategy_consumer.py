@@ -17,7 +17,7 @@ from nautilus_trader.config import (
     TradingNodeConfig,
 )
 from nautilus_trader.live.node import TradingNode
-from nautilus_trader.model.identifiers import ClientId, TraderId
+from nautilus_trader.model.identifiers import ClientId, InstrumentId, TraderId, Symbol
 
 # ============================================
 # 简单示例策略
@@ -27,7 +27,8 @@ from nautilus_trader.core.message import Event
 from nautilus_trader.model.data import QuoteTick
 from nautilus_trader.model.enums import OrderSide
 from nautilus_trader.model.orders import MarketOrder
-from nautilus_trader.strategy import Strategy
+from nautilus_trader.trading import Strategy
+from nautilus_trader.adapters.longport import LONGPORT
 
 
 class SimpleMarketMakingStrategy(Strategy):
@@ -38,18 +39,19 @@ class SimpleMarketMakingStrategy(Strategy):
 
     def __init__(self, instrument_id: str, trade_size: float = 0.001):
         super().__init__()
-        self.instrument_id = instrument_id
+        self.instrument_id_str = instrument_id
+        self.instrument_id = InstrumentId.from_str(instrument_id)
         self.trade_size = trade_size
         self.order_count = 0
 
     def on_start(self):
         """策略启动时调用"""
-        self.log.info(f"策略启动 - 交易对: {self.instrument_id}")
+        self.log.info(f"策略启动 - 交易对: {self.instrument_id_str}")
 
         # 获取交易工具
         instrument = self.cache.instrument(self.instrument_id)
         if instrument is None:
-            self.log.error(f"找不到交易工具: {self.instrument_id}")
+            self.log.error(f"找不到交易工具: {self.instrument_id_str}")
             return
 
         self.log.info(f"交易工具信息: {instrument}")
@@ -118,7 +120,7 @@ config = TradingNodeConfig(
         ),
 
         # 声明要订阅的外部流
-        external_streams=["market_data"],  # 订阅数据采集进程发布的 "market_data" stream
+        external_streams=["market_data_longport"],  # 订阅数据采集进程发布的 "market_data" stream
 
         encoding="msgpack",                # 必须与数据采集进程一致
     ),
@@ -126,7 +128,7 @@ config = TradingNodeConfig(
     # 数据引擎配置 - 声明外部数据客户端
     data_engine=LiveDataEngineConfig(
         # 声明 BINANCE 是外部客户端（数据来自 Redis，不是直接连接）
-        external_clients=[ClientId("BINANCE")],
+        external_clients=[ClientId(LONGPORT)],
         # 注意：这里不需要配置真正的 data_clients
     ),
 
@@ -160,10 +162,10 @@ def main():
     node = TradingNode(config=config)
 
     # 注册执行客户端工厂
-    node.add_exec_client_factory(BINANCE, BinanceLiveExecClientFactory)
+    # node.add_exec_client_factory(BINANCE, BinanceLiveExecClientFactory)
 
     # 添加策略
-    instrument_id = "BTCUSDT-PERP.BINANCE"  # 根据实际交易所调整格式
+    instrument_id = "AAPL.US"  # 根据实际交易所调整格式
     strategy = SimpleMarketMakingStrategy(
         instrument_id=instrument_id,
         trade_size=0.001,

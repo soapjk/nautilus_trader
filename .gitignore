@@ -126,3 +126,4 @@ tests/test_data/**/backtest/**
 data_catalog/
 */LICENSE
 .env
+.venv

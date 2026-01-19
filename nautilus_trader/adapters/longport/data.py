@@ -98,7 +98,7 @@ class LongportDataClient(LiveMarketDataClient):
         config: LongportDataClientConfig,
         name: str | None = None,
     ) -> None:
-        PyCondition.not_empty(config.markets, "config.markets")
+        # PyCondition.not_empty(config.markets, "config.markets")
         super().__init__(
             loop=loop,
             client_id=ClientId(name or LONGPORT_VENUE.value),
@@ -257,43 +257,18 @@ class LongportDataClient(LiveMarketDataClient):
         """
         Handle a push event from Longport WebSocket.
 
-        The event can be one of the following types from the Longport SDK:
-        - Quote event (SecurityQuote): Real-time quote data
-        - Trade event (Trade): Individual trades
-        - Depth event (SecurityDepth): Order book depth data
-        - Candlestick event (Candlestick): OHLCV bar data
-
-        Each event is converted to the corresponding Nautilus data type and
-        published through the message bus.
+        All events from Rust are returned as PyCapsule containing Nautilus Data.
+        This includes QuoteTick, TradeTick, OrderBookDeltas, and Bar types.
         """
         try:
-            # Check if event is a PyCapsule containing Nautilus Data
             if nautilus_pyo3.is_pycapsule(event):
                 # The capsule contains a pointer to `Data` owned and managed by Rust
                 data = capsule_to_data(event)
                 self._handle_data(data)
-                return
-
-            # Handle different event types from Longport SDK
-            # The event type is determined by its structure/type
-            event_type = type(event).__name__ if hasattr(event, "__class__") else type(event).__name__
-
-            if event_type == "QuoteTick":
-                # Already converted QuoteTick
-                self._handle_data(event)
-            elif event_type == "TradeTick":
-                # Already converted TradeTick
-                self._handle_data(event)
-            elif event_type == "OrderBookDeltas":
-                # Already converted OrderBookDeltas
-                self._handle_data(event)
-            elif event_type == "Bar":
-                # Already converted Bar
-                self._handle_data(event)
             else:
-                # Unknown event type - log for debugging
-                self._log.warning(f"Unhandled event type: {event_type}, event: {event}")
-
+                # Unexpected: should not happen as Rust always returns PyCapsule
+                event_type = type(event).__name__ if hasattr(event, "__class__") else type(event).__name__
+                self._log.warning(f"Unexpected non-PyCapsule event type: {event_type}, event: {event}")
         except Exception as e:
             self._log.error(f"Error handling push event: {e}")
 

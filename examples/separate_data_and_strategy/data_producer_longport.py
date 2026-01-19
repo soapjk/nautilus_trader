@@ -139,14 +139,13 @@ config = TradingNodeConfig(
     # 数据客户端配置
     data_clients={
         LONGPORT: LongportDataClientConfig(
-            # 从 .env 文件读取的认证信息
             http_url="https://openapi.longportapp.cn",
             quote_ws_url="wss://openapi-quote.longportapp.cn",
             trade_ws_url="wss://openapi-trade.longportapp.cn",
             app_key=LONGPORT_APP_KEY,
             app_secret=LONGPORT_APP_SECRET,
             access_token=LONGPORT_ACCESS_TOKEN,
-            markets=["HK", "US"],  # Use string representation (Python config)
+            # markets=["HK", "US"],  # Use string representation (Python config)
             instrument_provider=InstrumentProviderConfig(
                 load_ids=frozenset(instrument_id_strs),  # 只加载指定的交易对（使用字符串格式）
             ),
@@ -185,6 +184,7 @@ def main():
 
     # 配置数据采集器（订阅哪些数据）
     config_tester = DataTesterConfig(
+        log_data=True,
         instrument_ids=instrument_ids,
         # K线数据配置
         bar_types=[
@@ -192,7 +192,7 @@ def main():
             for instr_id in instrument_ids
         ],
         # 订阅配置
-        subscribe_instrument=False,      # 订阅交易工具信息
+        subscribe_instrument=True,       # 订阅交易工具信息
         subscribe_quotes=True,           # 订阅报价数据
         subscribe_trades=True,           # 订阅成交数据
         subscribe_book_deltas=True,      # 订阅订单簿增量
