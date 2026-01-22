@@ -37,8 +37,8 @@ from nautilus_trader.test_kit.strategies.tester_data import DataTesterConfig
 
 
 # Toggle between SPOT and FUTURES
-account_type = BinanceAccountType.USDT_FUTURES
-# account_type = BinanceAccountType.SPOT
+# account_type = BinanceAccountType.USDT_FUTURES
+account_type = BinanceAccountType.SPOT
 
 if account_type == BinanceAccountType.SPOT:
     symbol = "BTCUSDT"
@@ -73,12 +73,12 @@ node = TradingNode(config=config_node)
 config_tester = DataTesterConfig(
     instrument_ids=[instrument_id],
     bar_types=[BarType.from_str(f"{instrument_id}-1-MINUTE-LAST-EXTERNAL")],
-    subscribe_instrument=True,
-    subscribe_book_at_interval=True,
+    subscribe_instrument=False,
+    subscribe_book_at_interval=False,
     # subscribe_book_deltas=True,
     # subscribe_quotes=True,
     # subscribe_trades=True,
-    # subscribe_bars=True,
+    subscribe_bars=True,
     book_interval_ms=100,
 )
 

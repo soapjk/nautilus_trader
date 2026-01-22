@@ -43,7 +43,8 @@ use nautilus_common::{
     },
 };
 use nautilus_core::{MUTEX_POISONED, UUID4, UnixNanos, time::get_atomic_clock_realtime};
-use nautilus_execution::client::{ExecutionClient, base::ExecutionClientCore};
+use nautilus_common::clients::ExecutionClient;
+use nautilus_execution::client::base::ExecutionClientCore;
 use nautilus_model::{
     accounts::AccountAny,
     enums::{OmsType, OrderType as NautilusOrderType},
@@ -390,7 +391,7 @@ impl ExecutionClient for LongportExecutionClient {
     }
 
     fn submit_order(&self, cmd: &SubmitOrder) -> anyhow::Result<()> {
-        let order = &cmd.order;
+        let order = self.core.get_order(&cmd.client_order_id)?;
 
         if order.is_closed() {
             let client_order_id = order.client_order_id();
@@ -428,7 +429,7 @@ impl ExecutionClient for LongportExecutionClient {
         let account_id = self.core.account_id;
 
         // Build order options
-        let submit_opts = match self.build_submit_order_options(order) {
+        let submit_opts = match self.build_submit_order_options(&order_clone) {
             Ok(opts) => opts,
             Err(e) => {
                 tracing::error!("Failed to build submit order options: {e:?}");
