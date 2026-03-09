@@ -44,7 +44,7 @@ use nautilus_common::{
 };
 use nautilus_core::{MUTEX_POISONED, UUID4, UnixNanos, time::get_atomic_clock_realtime};
 use nautilus_common::clients::ExecutionClient;
-use nautilus_execution::client::base::ExecutionClientCore;
+use nautilus_execution::client::core::ExecutionClientCore;
 use nautilus_model::{
     accounts::AccountAny,
     enums::{OmsType, OrderType as NautilusOrderType},
@@ -275,7 +275,7 @@ impl ExecutionClient for LongportExecutionClient {
     }
 
     fn get_account(&self) -> Option<AccountAny> {
-        self.core.get_account()
+        self.core.cache().account(&self.core.account_id).cloned()
     }
 
     async fn connect(&mut self) -> anyhow::Result<()> {
@@ -354,8 +354,29 @@ impl ExecutionClient for LongportExecutionClient {
         reported: bool,
         ts_event: UnixNanos,
     ) -> anyhow::Result<()> {
-        self.core
-            .generate_account_state(balances, margins, reported, ts_event)
+        let account_state = AccountState::new(
+            self.core.account_id,
+            self.core.account_type,
+            balances,
+            margins,
+            reported,
+            UUID4::new(),
+            ts_event,
+            ts_event,
+            None, // base_currency
+        );
+
+        if let Some(sender) = &self.exec_event_sender {
+            if let Err(e) = sender.send(ExecutionEvent::Account(account_state)) {
+                tracing::warn!("Failed to send AccountState event: {e}");
+                anyhow::bail!("Failed to send AccountState event: {e}");
+            }
+        } else {
+            tracing::warn!("Cannot send AccountState: exec_event_sender not initialized");
+            anyhow::bail!("exec_event_sender not initialized");
+        }
+
+        Ok(())
     }
 
     fn start(&mut self) -> anyhow::Result<()> {
@@ -391,7 +412,12 @@ impl ExecutionClient for LongportExecutionClient {
     }
 
     fn submit_order(&self, cmd: &SubmitOrder) -> anyhow::Result<()> {
-        let order = self.core.get_order(&cmd.client_order_id)?;
+        let order = self
+            .core
+            .cache()
+            .order(&cmd.client_order_id)
+            .cloned()
+            .ok_or_else(|| anyhow::anyhow!("Order not found in cache: {}", cmd.client_order_id))?;
 
         if order.is_closed() {
             let client_order_id = order.client_order_id();
@@ -551,7 +577,7 @@ impl ExecutionClient for LongportExecutionClient {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use nautilus_common::{cache::Cache, clock::TestClock};
+    use nautilus_common::cache::Cache;
     use nautilus_model::{identifiers::{AccountId, ClientId, TraderId}, enums::{AccountType, OmsType}};
     use std::{cell::RefCell, rc::Rc};
 
@@ -564,7 +590,6 @@ mod tests {
         let oms_type = OmsType::Hedging;
         let account_type = AccountType::Cash;
 
-        let clock = Rc::new(RefCell::new(TestClock::new()));
         let cache = Rc::new(RefCell::new(Cache::default()));
 
         let core = ExecutionClientCore::new(
@@ -575,7 +600,6 @@ mod tests {
             account_id,
             account_type,
             None,
-            clock,
             cache,
         );
 

@@ -22,7 +22,7 @@ use nautilus_core::UnixNanos;
 use nautilus_model::{
     enums::{OrderSide, PositionSide, TimeInForce as NautilusTimeInForce, OrderType as NautilusOrderType},
     identifiers::{InstrumentId, Symbol},
-    instruments::{equity::Equity, InstrumentAny},
+    instruments::{equity::Equity, InstrumentAny, Instrument},
     types::{Currency, Price, Quantity},
 };
 
@@ -389,9 +389,9 @@ mod tests {
     #[test]
     fn test_parse_time_in_force() {
         assert!(parse_time_in_force(NautilusTimeInForce::Day).is_ok());
-        assert!(parse_time_in_force(NautilusTimeInForce::GTC).is_ok());
-        assert!(parse_time_in_force(NautilusTimeInForce::IOC).is_ok());
-        assert!(parse_time_in_force(NautilusTimeInForce::FOK).is_ok());
+        assert!(parse_time_in_force(NautilusTimeInForce::Gtc).is_ok());
+        assert!(parse_time_in_force(NautilusTimeInForce::Ioc).is_ok());
+        assert!(parse_time_in_force(NautilusTimeInForce::Fok).is_ok());
     }
 
     #[test]
@@ -419,6 +419,10 @@ mod tests {
             symbol: "700".to_string(),
             name: "Tencent".to_string(),
             market: LongportMarket::HK,
+            lot_size: 100,
+            tick_size: 0.01,
+            shortable: true,
+            marginable: true,
         };
 
         let result = parse_instrument(longport_instrument);

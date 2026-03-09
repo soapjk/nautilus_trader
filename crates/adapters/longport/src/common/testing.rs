@@ -15,16 +15,15 @@
 
 //! Testing utilities for the Longport adapter.
 
-use crate::common::models::LongportInstrument;
+use crate::common::{enums::LongportMarket, models::LongportInstrument};
 
 /// Creates a test Longport instrument for Hong Kong market.
 #[must_use]
 pub fn test_longport_instrument_hk() -> LongportInstrument {
     LongportInstrument {
         symbol: "700".to_string(),
-        market: "HK".to_string(),
-        security_type: "stock".to_string(),
         name: "Tencent Holdings Limited".to_string(),
+        market: LongportMarket::HK,
         lot_size: 100,
         tick_size: 0.05,
         shortable: true,
@@ -37,9 +36,8 @@ pub fn test_longport_instrument_hk() -> LongportInstrument {
 pub fn test_longport_instrument_us() -> LongportInstrument {
     LongportInstrument {
         symbol: "AAPL".to_string(),
-        market: "US".to_string(),
-        security_type: "stock".to_string(),
         name: "Apple Inc.".to_string(),
+        market: LongportMarket::US,
         lot_size: 1,
         tick_size: 0.01,
         shortable: true,

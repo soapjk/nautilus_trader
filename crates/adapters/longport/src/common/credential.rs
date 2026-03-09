@@ -82,12 +82,16 @@ mod tests {
     fn test_credential_debug_redaction() {
         let credential = Credential::new(
             Ustr::from("test_key"),
-            "secret".to_string(),
-            "token".to_string(),
+            "my_secret_value".to_string(),
+            "my_token_value".to_string(),
         );
         let debug_str = format!("{:?}", credential);
-        assert!(!debug_str.contains("secret"));
-        assert!(!debug_str.contains("token"));
-        assert!(debug_str.contains("<REDACTED>"));
+
+        // Check that actual secret values are redacted
+        assert!(!debug_str.contains("my_secret_value"), "Debug output should not contain actual secret value");
+        assert!(!debug_str.contains("my_token_value"), "Debug output should not contain actual token value");
+
+        // Check that redaction markers are present
+        assert!(debug_str.contains("<REDACTED>"), "Debug output should contain '<REDACTED>' markers");
     }
 }

@@ -278,8 +278,6 @@ tracing-subscriber = { version = "0.3.22", default-features = false, features = 
   "fmt",
   "registry",
 ] }
-tracing = "0.1.41"
-tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 tracing-test = "0.2.5"
 unbounded-interval-tree = { version = "1.1.2", default-features = false }
 url = { version = "2.5.8", default-features = false }
