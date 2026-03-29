@@ -144,6 +144,9 @@ class LongportDataClient(LiveMarketDataClient):
         self._log.info(f"Connecting to Longport (markets={self._config.markets})...")
 
         try:
+            # Initialize Rust TLS crypto provider before any TLS connections
+            nautilus_pyo3.HttpClient()
+
             # Create QuoteContext with optional custom URLs
             self._log.info("Creating QuoteContext...")
             self._quote_ctx, self._event_receiver = nautilus_pyo3.longport.create_quote_context(

@@ -19,6 +19,7 @@ use std::sync::Arc;
 use std::hash::{Hash, Hasher};
 use pyo3::prelude::*;
 use longport::{quote::QuoteContext, Config, quote::PushEvent, quote::PushEventDetail};
+use nautilus_cryptography::providers::install_cryptographic_provider;
 use nautilus_model::{
     data::Data,
     instruments::{InstrumentAny, Instrument},
@@ -527,6 +528,7 @@ pub fn create_quote_context(
     quote_ws_url: Option<String>,
     trade_ws_url: Option<String>,
 ) -> PyResult<(PyQuoteContext, PyPushEventReceiver)> {
+    install_cryptographic_provider();
     let _ = (http_url, quote_ws_url, trade_ws_url);  // Suppress unused warnings
     // Build the configuration
     let config = Config::new(app_key, app_secret, access_token);

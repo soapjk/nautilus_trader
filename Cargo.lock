@@ -5681,6 +5681,7 @@ dependencies = [
  "longport",
  "nautilus-common",
  "nautilus-core",
+ "nautilus-cryptography",
  "nautilus-data",
  "nautilus-execution",
  "nautilus-infrastructure",
