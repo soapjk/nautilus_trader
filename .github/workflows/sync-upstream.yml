@@ -1,11 +1,11 @@
-name: Sync official upstream
+name: Force sync official develop
 
 on:
   schedule:
     - cron: "17 20 * * *" # Daily at 04:17 Asia/Shanghai
   workflow_dispatch:
   push:
-    branches: [develop]
+    branches: [main]
     paths:
       - .github/workflows/sync-upstream.yml
 
@@ -18,14 +18,17 @@ concurrency:
 
 jobs:
   sync:
-    if: github.repository == 'soapjk/nautilus_trader' && github.ref == 'refs/heads/develop'
+    if: github.repository == 'soapjk/nautilus_trader' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Merge official develop without discarding fork changes
+      - name: Replace develop with the official upstream commit
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          gh api --method POST repos/soapjk/nautilus_trader/merge-upstream \
-            -f branch=develop
+          upstream_commit="$(gh api \
+            repos/nautechsystems/nautilus_trader/commits/develop --jq .sha)"
+          [[ "$upstream_commit" =~ ^[0-9a-f]{40}$ ]]
+          gh api --method PATCH repos/soapjk/nautilus_trader/git/refs/heads/develop \
+            -f sha="$upstream_commit" -F force=true
